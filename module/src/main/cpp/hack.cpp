@@ -16,11 +16,41 @@
 #include <sys/mman.h>
 #include <linux/unistd.h>
 #include <array>
+#include <string>
+#include <fstream>
+
+// Fungsi baru: Cari path asli libcsharp.so dari /proc/self/maps
+std::string FindLibCsharpPath() {
+    std::ifstream maps("/proc/self/maps");
+    std::string line;
+    while (std::getline(maps, line)) {
+        if (line.find("libcsharp.so") != std::string::npos) {
+            size_t pos = line.find('/');
+            if (pos != std::string::npos) {
+                return line.substr(pos);
+            }
+        }
+    }
+    return "";
+}
 
 void hack_start(const char *game_data_dir) {
     bool load = false;
     for (int i = 0; i < 10; i++) {
-        void *handle = xdl_open("libcsharp.so", 0);
+        void *handle = nullptr;
+        
+        // 1. Coba panggil pake nama biasa dulu
+        handle = xdl_open("libcsharp.so", 0);
+        
+        // 2. Kalau gagal, cari path manual dari maps
+        if (!handle) {
+            std::string real_path = FindLibCsharpPath();
+            if (!real_path.empty()) {
+                LOGI("found libcsharp path from maps: %s", real_path.c_str());
+                handle = xdl_open(real_path.c_str(), 0);
+            }
+        }
+
         if (handle) {
             load = true;
             il2cpp_api_init(handle);
@@ -96,11 +126,8 @@ static std::string GetNativeBridgeLibrary() {
 struct NativeBridgeCallbacks {
     uint32_t version;
     void *initialize;
-
     void *(*loadLibrary)(const char *libpath, int flag);
-
     void *(*getTrampoline)(void *handle, const char *name, const char *shorty, uint32_t len);
-
     void *isSupported;
     void *getAppEnv;
     void *isCompatibleWith;
@@ -111,7 +138,6 @@ struct NativeBridgeCallbacks {
     void *initAnonymousNamespace;
     void *createNamespace;
     void *linkNamespaces;
-
     void *(*loadLibraryExt)(const char *libpath, int flag, void *ns);
 };
 
