@@ -20,7 +20,7 @@
 void hack_start(const char *game_data_dir) {
     bool load = false;
     for (int i = 0; i < 10; i++) {
-        void *handle = xdl_open("libil2cpp.so", 0);
+        void *handle = xdl_open("libcsharp.so", 0);
         if (handle) {
             load = true;
             il2cpp_api_init(handle);
@@ -31,7 +31,7 @@ void hack_start(const char *game_data_dir) {
         }
     }
     if (!load) {
-        LOGI("libil2cpp.so not found in thread %d", gettid());
+        LOGI("libcsharp.so not found in thread %d", gettid());
     }
 }
 
@@ -115,9 +115,6 @@ struct NativeBridgeCallbacks {
     void *(*loadLibraryExt)(const char *libpath, int flag, void *ns);
 };
 
-// Poll (bounded) until a JavaVM exists and ActivityThread.currentApplication() is non-null,
-// signalling the native bridge (houdini) is up. Replaces a fixed sleep. Returns the VM, or
-// nullptr on timeout.
 static JavaVM *WaitForRuntime(void *libart) {
     auto JNI_GetCreatedJavaVMs = (jint (*)(JavaVM **, jsize, jsize *)) dlsym(
             libart, "JNI_GetCreatedJavaVMs");
@@ -126,7 +123,7 @@ static JavaVM *WaitForRuntime(void *libart) {
         LOGE("dlsym JNI_GetCreatedJavaVMs failed");
         return nullptr;
     }
-    for (int i = 0; i < 300; i++) { // up to ~30s at 100ms per iteration
+    for (int i = 0; i < 300; i++) {
         JavaVM *vms_buf[1];
         jsize num_vms = 0;
         if (JNI_GetCreatedJavaVMs(vms_buf, 1, &num_vms) == JNI_OK && num_vms > 0) {
